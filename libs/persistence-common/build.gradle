@@ -1,0 +1,5 @@
+dependencies {
+    api project(':libs:common-domain')
+
+    // JPA / MyBatis / Flyway 등 영속성 의존성은 추후 결정
+}

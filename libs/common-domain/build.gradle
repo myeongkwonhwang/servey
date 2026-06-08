@@ -1,0 +1,3 @@
+dependencies {
+    // 가장 안쪽 lib — 외부 의존 없음
+}

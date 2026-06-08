@@ -1,0 +1,8 @@
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+
+    implementation project(':libs:channel-event-schema')
+    implementation project(':libs:common-domain')
+    implementation project(':libs:kafka-infra')
+    implementation project(':libs:persistence-common')
+}

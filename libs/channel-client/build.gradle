@@ -1,0 +1,6 @@
+dependencies {
+    api project(':libs:common-domain')
+    api project(':libs:channel-event-schema')
+
+    // Feign / WebClient / Token Provider / RateLimiter / Recovery 의존성은 추후 추가
+}

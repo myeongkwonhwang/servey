@@ -1,0 +1,12 @@
+rootProject.name = 'partner-channel-msa'
+
+include 'services:channel-batch'
+include 'services:channel-adapter'
+include 'services:service-core'
+include 'services:saga-orchestrator'
+
+include 'libs:channel-client'
+include 'libs:channel-event-schema'
+include 'libs:common-domain'
+include 'libs:kafka-infra'
+include 'libs:persistence-common'

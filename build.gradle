@@ -1,0 +1,73 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.5' apply false
+    id 'io.spring.dependency-management' version '1.1.6' apply false
+}
+
+allprojects {
+    group = 'io.github.orange2652.partner.channel'
+    version = '0.0.1-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+        }
+    }
+
+    dependencies {
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+
+        testCompileOnly 'org.projectlombok:lombok'
+        testAnnotationProcessor 'org.projectlombok:lombok'
+
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+}
+
+// services/* 는 실행 가능한 Spring Boot 앱
+configure(subprojects.findAll { it.path.startsWith(':services:') }) {
+    apply plugin: 'org.springframework.boot'
+
+    bootJar {
+        enabled = true
+    }
+
+    jar {
+        enabled = false
+    }
+}
+
+// libs/* 는 라이브러리 jar (실행 X)
+configure(subprojects.findAll { it.path.startsWith(':libs:') }) {
+    apply plugin: 'java-library'
+
+    bootJar {
+        enabled = false
+    }
+
+    jar {
+        enabled = true
+    }
+}
