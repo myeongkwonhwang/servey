@@ -35,3 +35,7 @@ bin/
 # Logs
 *.log
 logs/
+
+# Project-private (개인 작업 지침 / 메모)
+CLAUDE.md
+.claude/
