@@ -1,3 +1,43 @@
 spring:
   application:
     name: service-core
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/partner_channel?currentSchema=core_schema
+    username: pcm
+    password: pcm
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.default_schema: core_schema
+
+  flyway:
+    enabled: true
+    schemas: core_schema
+    default-schema: core_schema
+    create-schemas: true
+    locations: classpath:db/migration/core
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: service-core
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: 'io.github.orange2652.partner.channel.*'
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

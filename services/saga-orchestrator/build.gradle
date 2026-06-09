@@ -1,6 +1,19 @@
 dependencies {
+    // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-json'   // ObjectMapper auto-config (Jackson)
 
+    // Kafka (Saga command/reply)
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // DB + Migration (saga_state 영속화)
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    // Internal libs (외부 API 호출 없음)
     implementation project(':libs:channel-event-schema')
     implementation project(':libs:common-domain')
     implementation project(':libs:kafka-infra')

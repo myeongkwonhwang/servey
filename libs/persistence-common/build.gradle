@@ -1,5 +1,6 @@
 dependencies {
     api project(':libs:common-domain')
 
-    // JPA / MyBatis / Flyway 등 영속성 의존성은 추후 결정
+    // JPA — Outbox / PollingCursor 등 영속 엔티티 + Spring Data
+    api 'org.springframework.boot:spring-boot-starter-data-jpa'
 }

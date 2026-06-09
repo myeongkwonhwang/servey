@@ -1,6 +1,19 @@
 dependencies {
+    // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+    // Kafka (consumer 중심)
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // DB + Migration
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    // Internal libs (외부 API 호출 없음 — channel-client 미포함)
     implementation project(':libs:channel-event-schema')
     implementation project(':libs:common-domain')
     implementation project(':libs:kafka-infra')

@@ -1,3 +1,42 @@
 spring:
   application:
     name: channel-adapter
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/partner_channel?currentSchema=channel_schema
+    username: pcm
+    password: pcm
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.default_schema: channel_schema
+      hibernate.jdbc.time_zone: Asia/Seoul
+
+  jackson:
+    time-zone: Asia/Seoul
+
+  flyway:
+    enabled: false   # channel_schema 의 migration owner 는 channel-batch
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: channel-adapter
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
