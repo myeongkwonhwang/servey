@@ -2,7 +2,7 @@ package io.github.orange2652.partner.channel.batch.publisher;
 
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxEvent;
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxRepository;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +50,7 @@ class OutboxPublisher {
             if (!sendOne(event)) {
                 break;
             }
-            outboxRepository.markPublished(event.id(), Instant.now());
+            outboxRepository.markPublished(event.id(), LocalDateTime.now());
             published++;
         }
         log.info("outbox publish round picked={} published={}", events.size(), published);

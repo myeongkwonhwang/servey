@@ -1,6 +1,6 @@
 package io.github.orange2652.partner.channel.persistence.outbox.infra;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,5 +14,5 @@ interface OutboxJpaRepository extends JpaRepository<OutboxJpaEntity, Long> {
 
     @Modifying
     @Query("UPDATE OutboxJpaEntity o SET o.publishedAt = :publishedAt WHERE o.id = :id")
-    int updatePublishedAt(@Param("id") Long id, @Param("publishedAt") Instant publishedAt);
+    int updatePublishedAt(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
 }

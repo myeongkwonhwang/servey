@@ -3,7 +3,7 @@ package io.github.orange2652.partner.channel.batch.external.toss;
 import io.github.orange2652.partner.channel.client.toss.TossOrderClient;
 import io.github.orange2652.partner.channel.client.toss.TossOrderItem;
 import io.github.orange2652.partner.channel.client.toss.TossOrderPage;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +21,10 @@ class MockTossOrderClient implements TossOrderClient {
     private final AtomicLong counter = new AtomicLong(1L);
 
     @Override
-    public TossOrderPage fetch(Instant windowStart, Instant windowEnd, String nextCursor, int limit) {
+    public TossOrderPage fetch(LocalDateTime windowStart, LocalDateTime windowEnd, String nextCursor, int limit) {
         long opid = counter.getAndIncrement();
         long productId = 100L + opid;
-        Instant ordered = Instant.now();
+        LocalDateTime ordered = LocalDateTime.now();
         String raw = """
                 {"orderId":%d,"orderProductId":%d,"productId":%d,"orderProductStatus":"PAID","orderedAt":"%s"}\
                 """.formatted(opid, opid, productId, ordered);

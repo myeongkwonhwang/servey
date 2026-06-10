@@ -13,9 +13,10 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 
-    // Internal libs (외부 API 호출 없음 — channel-client 미포함)
+    // Internal libs
     implementation project(':libs:channel-event-schema')
     implementation project(':libs:common-domain')
     implementation project(':libs:kafka-infra')
+    implementation project(':libs:logistics-gateway')   // 자사 물류 시스템 DB-to-DB Gateway (step 3)
     implementation project(':libs:persistence-common')
 }

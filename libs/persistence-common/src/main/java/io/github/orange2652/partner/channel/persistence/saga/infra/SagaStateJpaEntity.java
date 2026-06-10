@@ -8,7 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -53,10 +53,10 @@ class SagaStateJpaEntity {
     private String payload;
 
     @Column(name = "started_at", nullable = false)
-    private Instant startedAt;
+    private LocalDateTime startedAt;
 
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
     static SagaStateJpaEntity from(SagaState state) {
         return SagaStateJpaEntity.builder()

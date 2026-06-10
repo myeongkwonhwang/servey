@@ -7,7 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,15 +40,18 @@ class StagingOrderJpaEntity {
     @Column(name = "external_status", nullable = false, length = 64)
     private String externalStatus;
 
+    @Column(name = "status", nullable = false, length = 32)
+    private String status;
+
     @Column(name = "ordered_at", nullable = false)
-    private Instant orderedAt;
+    private LocalDateTime orderedAt;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw", nullable = false, columnDefinition = "jsonb")
     private String raw;
 
     @Column(name = "received_at", nullable = false)
-    private Instant receivedAt;
+    private LocalDateTime receivedAt;
 
     static StagingOrderJpaEntity from(StagingOrder order) {
         return StagingOrderJpaEntity.builder()
@@ -57,6 +60,7 @@ class StagingOrderJpaEntity {
                 .externalOrderId(order.externalOrderId())
                 .externalOrderProductId(order.externalOrderProductId())
                 .externalStatus(order.externalStatus())
+                .status(order.status())
                 .orderedAt(order.orderedAt())
                 .raw(order.raw())
                 .receivedAt(order.receivedAt())
@@ -65,6 +69,6 @@ class StagingOrderJpaEntity {
 
     StagingOrder toDomain() {
         return new StagingOrder(id, channel, externalOrderId, externalOrderProductId,
-                externalStatus, orderedAt, raw, receivedAt);
+                externalStatus, status, orderedAt, raw, receivedAt);
     }
 }

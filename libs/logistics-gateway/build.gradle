@@ -1,0 +1,5 @@
+dependencies {
+    api project(':libs:common-domain')
+
+    // 자사 물류 시스템 DB-to-DB interface 추상화. 실제 구현 (DB connection / interface table / Kafka 등) 은 Phase 1+
+}

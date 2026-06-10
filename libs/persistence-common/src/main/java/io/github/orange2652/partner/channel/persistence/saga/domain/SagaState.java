@@ -1,6 +1,6 @@
 package io.github.orange2652.partner.channel.persistence.saga.domain;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -31,8 +31,8 @@ public record SagaState(
         String currentStep,
         SagaStatus status,
         String payload,
-        Instant startedAt,
-        Instant updatedAt
+        LocalDateTime startedAt,
+        LocalDateTime updatedAt
 ) {
     public SagaState {
         Objects.requireNonNull(sagaId, "sagaId");
@@ -46,7 +46,7 @@ public record SagaState(
     }
 
     /**
-     * 새 saga 인스턴스 — {@code status=RUNNING}, {@code sagaId} 자동 생성, 시작/갱신 시각은 {@link Instant#now()}.
+     * 새 saga 인스턴스 — {@code status=RUNNING}, {@code sagaId} 자동 생성, 시작/갱신 시각은 {@link LocalDateTime#now()}.
      *
      * @param sagaType       saga 종류 식별자
      * @param correlationKey 외부 식별자
@@ -58,7 +58,7 @@ public record SagaState(
                                   String correlationKey,
                                   String initialStep,
                                   String payload) {
-        Instant now = Instant.now();
+        LocalDateTime now = LocalDateTime.now();
         return new SagaState(UUID.randomUUID(), sagaType, correlationKey,
                 initialStep, SagaStatus.RUNNING, payload, now, now);
     }
@@ -68,7 +68,7 @@ public record SagaState(
      */
     public SagaState advance(String nextStep) {
         return new SagaState(sagaId, sagaType, correlationKey, nextStep,
-                SagaStatus.RUNNING, payload, startedAt, Instant.now());
+                SagaStatus.RUNNING, payload, startedAt, LocalDateTime.now());
     }
 
     /**
@@ -76,7 +76,7 @@ public record SagaState(
      */
     public SagaState compensate() {
         return new SagaState(sagaId, sagaType, correlationKey, currentStep,
-                SagaStatus.COMPENSATING, payload, startedAt, Instant.now());
+                SagaStatus.COMPENSATING, payload, startedAt, LocalDateTime.now());
     }
 
     /**
@@ -84,7 +84,7 @@ public record SagaState(
      */
     public SagaState complete() {
         return new SagaState(sagaId, sagaType, correlationKey, currentStep,
-                SagaStatus.COMPLETED, payload, startedAt, Instant.now());
+                SagaStatus.COMPLETED, payload, startedAt, LocalDateTime.now());
     }
 
     /**
@@ -92,6 +92,6 @@ public record SagaState(
      */
     public SagaState abort() {
         return new SagaState(sagaId, sagaType, correlationKey, currentStep,
-                SagaStatus.ABORTED, payload, startedAt, Instant.now());
+                SagaStatus.ABORTED, payload, startedAt, LocalDateTime.now());
     }
 }

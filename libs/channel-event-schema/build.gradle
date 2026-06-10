@@ -1,3 +1,6 @@
 dependencies {
     api project(':libs:common-domain')
+
+    // 이벤트 DTO 의 Jackson 어노테이션 (@JsonIgnoreProperties 등). runtime 은 소비 측 (services) 에 이미 존재
+    compileOnly 'com.fasterxml.jackson.core:jackson-annotations'
 }

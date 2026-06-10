@@ -8,7 +8,7 @@ import io.github.orange2652.partner.channel.persistence.cursor.domain.PollingCur
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxEvent;
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxRepository;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +56,7 @@ public class TossOrderPollingService {
     private PollingCursor loadOrInitCursor() {
         return pollingCursorRepository.find(CHANNEL, RESOURCE)
                 .orElseGet(() -> {
-                    Instant now = Instant.now();
+                    LocalDateTime now = LocalDateTime.now();
                     return PollingCursor.initial(CHANNEL, RESOURCE, now.minus(INITIAL_WINDOW), now);
                 });
     }
@@ -79,7 +79,7 @@ public class TossOrderPollingService {
             return prev.advance(page.nextCursor());
         }
         // 윈도우 완료 → 다음 윈도우는 (prev.windowEnd, now). 갭 없이 이어붙임
-        return prev.rollWindow(prev.windowEnd(), Instant.now());
+        return prev.rollWindow(prev.windowEnd(), LocalDateTime.now());
     }
 
     private String buildHeaders() {

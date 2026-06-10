@@ -1,7 +1,7 @@
 package io.github.orange2652.partner.channel.adapter.external.toss;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * 토스 주문 조회 v2 응답의 한 건 (Kafka payload).
@@ -14,6 +14,6 @@ record TossOrderPayload(
         Long orderProductId,
         Long productId,
         String orderProductStatus,
-        Instant orderedAt
+        LocalDateTime orderedAt
 ) {
 }

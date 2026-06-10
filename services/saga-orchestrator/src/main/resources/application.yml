@@ -13,10 +13,9 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.default_schema: saga_schema
-      hibernate.jdbc.time_zone: Asia/Seoul
 
   jackson:
-    time-zone: Asia/Seoul
+    time-zone: Asia/Seoul   # LocalDateTime 외 Date / Instant 출력에 영향 (학습 단계 보존)
 
   flyway:
     enabled: true

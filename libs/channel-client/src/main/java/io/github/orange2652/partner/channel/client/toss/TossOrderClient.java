@@ -1,6 +1,6 @@
 package io.github.orange2652.partner.channel.client.toss;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * 토스 주문 조회 Port.
@@ -13,5 +13,5 @@ import java.time.Instant;
  */
 public interface TossOrderClient {
 
-    TossOrderPage fetch(Instant windowStart, Instant windowEnd, String nextCursor, int limit);
+    TossOrderPage fetch(LocalDateTime windowStart, LocalDateTime windowEnd, String nextCursor, int limit);
 }

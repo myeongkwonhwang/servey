@@ -1,6 +1,6 @@
 package io.github.orange2652.partner.channel.persistence.cursor.domain;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
@@ -17,10 +17,10 @@ import java.util.Objects;
 public record PollingCursor(
         String channel,
         String resource,
-        Instant windowStart,
-        Instant windowEnd,
+        LocalDateTime windowStart,
+        LocalDateTime windowEnd,
         String nextCursor,
-        Instant updatedAt
+        LocalDateTime updatedAt
 ) {
     public PollingCursor {
         Objects.requireNonNull(channel, "channel");
@@ -30,19 +30,32 @@ public record PollingCursor(
         Objects.requireNonNull(updatedAt, "updatedAt");
     }
 
+    /**
+     * 최초 폴링 — 윈도우만 설정, {@code nextCursor=null}.
+     */
     public static PollingCursor initial(String channel, String resource,
-                                        Instant windowStart, Instant windowEnd) {
-        return new PollingCursor(channel, resource, windowStart, windowEnd, null, Instant.now());
+                                        LocalDateTime windowStart, LocalDateTime windowEnd) {
+        return new PollingCursor(channel, resource, windowStart, windowEnd, null, LocalDateTime.now());
     }
 
+    /**
+     * 같은 윈도우 안 다음 페이지로 진행 — {@code nextCursor} 갱신.
+     */
     public PollingCursor advance(String nextCursor) {
-        return new PollingCursor(channel, resource, windowStart, windowEnd, nextCursor, Instant.now());
+        return new PollingCursor(channel, resource, windowStart, windowEnd, nextCursor, LocalDateTime.now());
     }
 
-    public PollingCursor rollWindow(Instant newWindowStart, Instant newWindowEnd) {
-        return new PollingCursor(channel, resource, newWindowStart, newWindowEnd, null, Instant.now());
+    /**
+     * 다음 윈도우로 전환 — 윈도우 갱신 + {@code nextCursor=null} 리셋.
+     * 호출자 책임: 윈도우를 갭 없이 이어붙임 (이전 {@code windowEnd} 를 다음 {@code windowStart} 로).
+     */
+    public PollingCursor rollWindow(LocalDateTime newWindowStart, LocalDateTime newWindowEnd) {
+        return new PollingCursor(channel, resource, newWindowStart, newWindowEnd, null, LocalDateTime.now());
     }
 
+    /**
+     * 현재 윈도우의 모든 페이지를 다 가져왔는지 — {@code nextCursor IS NULL}.
+     */
     public boolean windowCompleted() {
         return nextCursor == null;
     }

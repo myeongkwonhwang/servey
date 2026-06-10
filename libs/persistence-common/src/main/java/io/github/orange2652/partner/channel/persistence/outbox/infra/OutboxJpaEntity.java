@@ -7,7 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -46,10 +46,10 @@ class OutboxJpaEntity {
     private String headers;
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @Column(name = "published_at")
-    private Instant publishedAt;
+    private LocalDateTime publishedAt;
 
     static OutboxJpaEntity from(OutboxEvent event) {
         return OutboxJpaEntity.builder()

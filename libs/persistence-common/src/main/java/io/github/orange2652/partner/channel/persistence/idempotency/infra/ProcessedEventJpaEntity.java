@@ -6,7 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "processed_event", schema = "channel_schema")
+@Table(name = "processed_event")   // schema 명시 X — 각 서비스의 hibernate.default_schema 사용 (channel_schema / core_schema)
 @IdClass(ProcessedEventId.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -31,7 +31,7 @@ class ProcessedEventJpaEntity {
     private String eventId;
 
     @Column(name = "processed_at", nullable = false)
-    private Instant processedAt;
+    private LocalDateTime processedAt;
 
     static ProcessedEventJpaEntity from(ProcessedEvent event) {
         return ProcessedEventJpaEntity.builder()

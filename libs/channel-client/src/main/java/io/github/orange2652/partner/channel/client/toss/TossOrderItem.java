@@ -1,6 +1,6 @@
 package io.github.orange2652.partner.channel.client.toss;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
@@ -13,7 +13,7 @@ public record TossOrderItem(
         Long orderProductId,
         Long productId,
         String orderProductStatus,
-        Instant orderedAt,
+        LocalDateTime orderedAt,
         String raw
 ) {
     public TossOrderItem {

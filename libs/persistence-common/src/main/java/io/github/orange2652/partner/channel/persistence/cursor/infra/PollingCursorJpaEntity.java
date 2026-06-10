@@ -6,7 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,16 +31,16 @@ class PollingCursorJpaEntity {
     private String resource;
 
     @Column(name = "window_start", nullable = false)
-    private Instant windowStart;
+    private LocalDateTime windowStart;
 
     @Column(name = "window_end", nullable = false)
-    private Instant windowEnd;
+    private LocalDateTime windowEnd;
 
     @Column(name = "next_cursor", columnDefinition = "text")
     private String nextCursor;
 
     @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
     static PollingCursorJpaEntity from(PollingCursor cursor) {
         return PollingCursorJpaEntity.builder()

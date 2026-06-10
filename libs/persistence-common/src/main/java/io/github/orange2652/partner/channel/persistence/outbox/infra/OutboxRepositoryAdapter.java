@@ -2,7 +2,7 @@ package io.github.orange2652.partner.channel.persistence.outbox.infra;
 
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxEvent;
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxRepository;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -30,7 +30,7 @@ class OutboxRepositoryAdapter implements OutboxRepository {
 
     @Override
     @Transactional
-    public void markPublished(Long id, Instant publishedAt) {
+    public void markPublished(Long id, LocalDateTime publishedAt) {
         jpaRepository.updatePublishedAt(id, publishedAt);
     }
 }

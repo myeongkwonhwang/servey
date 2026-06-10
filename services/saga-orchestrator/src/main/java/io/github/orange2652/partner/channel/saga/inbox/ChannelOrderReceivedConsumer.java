@@ -3,7 +3,12 @@ package io.github.orange2652.partner.channel.saga.inbox;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.orange2652.partner.channel.event.saga.SagaSteps;
+import io.github.orange2652.partner.channel.event.saga.SagaTypes;
+import io.github.orange2652.partner.channel.event.saga.UnconfirmedOrderCommand;
 import io.github.orange2652.partner.channel.persistence.saga.domain.SagaState;
+import io.github.orange2652.partner.channel.saga.state.SagaStateAdvancer;
+import io.github.orange2652.partner.channel.saga.unconfirmedOrder.UnconfirmedOrderCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -15,17 +20,20 @@ import org.springframework.stereotype.Component;
 /**
  * A1 흐름의 saga 시작 진입점.
  *
- * <p>{@code channel.order.received} consume → {@link SagaState} 생성 → {@link SagaStarter} 위임.</p>
+ * <p>{@code channel.order.received} consume → {@link SagaState} 생성 → {@link SagaStarter} 위임
+ * → {@link UnconfirmedOrderCommandPublisher} 로 step 1 command 발행 → {@link SagaStateAdvancer} 로
+ * {@code UNCONFIRMED_ORDER_SENT} 전이.</p>
  *
  * <p><b>흐름</b></p>
  * <ol>
- *   <li>Kafka 에서 payload (외부 주문 raw JSON) + key (= correlationKey = orderProductId) 수신</li>
- *   <li>payload 파싱하여 {@code orderProductId} 추출 (key 가 없거나 신뢰 못 하는 경우 대비)</li>
- *   <li>{@link SagaState#start} 로 saga 인스턴스 생성 (status=RUNNING, currentStep=STARTED)</li>
- *   <li>{@link SagaStarter#startIfAbsent} 호출 — UNIQUE 제약으로 중복 시작 방지</li>
+ *   <li>Kafka 에서 payload (외부 raw JSON) + key (= correlationKey = orderProductId) 수신</li>
+ *   <li>payload 파싱하여 {@code orderProductId} 추출 (key 없을 때 fallback)</li>
+ *   <li>{@link SagaState#start} → {@link SagaStarter#startIfAbsent} (Tx) — UNIQUE 로 중복 시작 차단</li>
+ *   <li>(Tx 밖) {@link UnconfirmedOrderCommandPublisher#publish} — Kafka send + ack</li>
+ *   <li>(Tx) {@link SagaStateAdvancer#advance} → {@code UNCONFIRMED_ORDER_SENT}</li>
  * </ol>
  *
- * <p>다음 step (channel-adapter 의 staging INSERT 명령 발행) 은 별도 라운드.</p>
+ * <p>채널: 현재 토스 전용 (channel="TOSS" 고정). 다채널 시 Kafka header 또는 별도 consumer 로 분리.</p>
  */
 @Slf4j
 @Component
@@ -34,10 +42,11 @@ class ChannelOrderReceivedConsumer {
 
     static final String TOPIC = "channel.order.received";
     static final String CONSUMER_NAME = "saga-orchestrator";
-    static final String SAGA_TYPE = "A1_ORDER_RECEPTION";
-    static final String INITIAL_STEP = "STARTED";
+    static final String CHANNEL = "TOSS";
 
     private final SagaStarter sagaStarter;
+    private final UnconfirmedOrderCommandPublisher unconfirmedOrderCommandPublisher;
+    private final SagaStateAdvancer sagaStateAdvancer;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = TOPIC, groupId = CONSUMER_NAME)
@@ -52,14 +61,23 @@ class ChannelOrderReceivedConsumer {
             return;
         }
 
-        SagaState state = SagaState.start(SAGA_TYPE, correlationKey, INITIAL_STEP, payload);
+        SagaState state = SagaState.start(SagaTypes.ORDER_RECEPTION, correlationKey, SagaSteps.STARTED, payload);
 
         boolean started = sagaStarter.startIfAbsent(state);
-
-        if (started) {
-            log.info("saga started sagaId={} sagaType={} correlationKey={}",
-                    state.sagaId(), SAGA_TYPE, correlationKey);
+        if (!started) {
+            return;
         }
+        log.info("saga started sagaId={} sagaType={} correlationKey={}",
+                state.sagaId(), SagaTypes.ORDER_RECEPTION, correlationKey);
+
+        UnconfirmedOrderCommand command = new UnconfirmedOrderCommand(CHANNEL, payload);
+        boolean published = unconfirmedOrderCommandPublisher.publish(state.sagaId(), command);
+        if (!published) {
+            log.info("unconfirmedOrder command publish failed — saga stays at STARTED sagaId={}", state.sagaId());
+            return;
+        }
+
+        sagaStateAdvancer.advance(state.sagaId(), SagaSteps.UNCONFIRMED_ORDER_SENT);
     }
 
     /**
