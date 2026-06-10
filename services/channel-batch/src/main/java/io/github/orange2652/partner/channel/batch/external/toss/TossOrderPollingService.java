@@ -34,10 +34,12 @@ public class TossOrderPollingService {
     static final String EVENT_TYPE = "OrderReceived";
     static final int FETCH_LIMIT = 50;
     static final Duration INITIAL_WINDOW = Duration.ofHours(1);
+    static final Duration RECEPTION_DELAY = OrderReceptionEligibilityFilter.RECEPTION_DELAY;
 
     private final TossOrderClient tossOrderClient;
     private final OutboxRepository outboxRepository;
     private final PollingCursorRepository pollingCursorRepository;
+    private final OrderReceptionEligibilityFilter eligibilityFilter;
     private final TransactionTemplate transactionTemplate;
 
     public void poll() {
@@ -47,22 +49,25 @@ public class TossOrderPollingService {
                 cursor.windowStart(), cursor.windowEnd(), cursor.nextCursor(), FETCH_LIMIT);
 
         transactionTemplate.executeWithoutResult(status -> persistResults(cursor, page));
-
-        log.info("toss order polled channel={} resource={} window=({}~{}) prevCursor={} fetched={} nextCursor={}",
-                CHANNEL, RESOURCE, cursor.windowStart(), cursor.windowEnd(),
-                cursor.nextCursor(), page.results().size(), page.nextCursor());
     }
 
     private PollingCursor loadOrInitCursor() {
         return pollingCursorRepository.find(CHANNEL, RESOURCE)
                 .orElseGet(() -> {
-                    LocalDateTime now = LocalDateTime.now();
-                    return PollingCursor.initial(CHANNEL, RESOURCE, now.minus(INITIAL_WINDOW), now);
+                    LocalDateTime end = LocalDateTime.now().minus(RECEPTION_DELAY);
+                    return PollingCursor.initial(CHANNEL, RESOURCE, end.minus(INITIAL_WINDOW), end);
                 });
     }
 
     private void persistResults(PollingCursor prev, TossOrderPage page) {
+        int fetched = page.results().size();
+        int eligible = 0;
+        int skipped = 0;
         for (TossOrderItem item : page.results()) {
+            if (!eligibilityFilter.isEligible(item)) {
+                skipped++;
+                continue;
+            }
             OutboxEvent event = OutboxEvent.newEvent(
                     AGGREGATE_TYPE,
                     item.orderProductId().toString(),
@@ -70,16 +75,21 @@ public class TossOrderPollingService {
                     item.raw(),
                     buildHeaders());
             outboxRepository.save(event);
+            eligible++;
         }
         pollingCursorRepository.save(nextCursor(prev, page));
+
+        log.info("toss order polled channel={} resource={} window=({}~{}) prevCursor={} fetched={} eligible={} skipped={} nextCursor={}",
+                CHANNEL, RESOURCE, prev.windowStart(), prev.windowEnd(),
+                prev.nextCursor(), fetched, eligible, skipped, page.nextCursor());
     }
 
     private PollingCursor nextCursor(PollingCursor prev, TossOrderPage page) {
         if (page.nextCursor() != null) {
             return prev.advance(page.nextCursor());
         }
-        // 윈도우 완료 → 다음 윈도우는 (prev.windowEnd, now). 갭 없이 이어붙임
-        return prev.rollWindow(prev.windowEnd(), LocalDateTime.now());
+        // 윈도우 완료 → 다음 윈도우는 (prev.windowEnd, now - RECEPTION_DELAY). 30분 미경과 영역은 cursor 가 진입 X
+        return prev.rollWindow(prev.windowEnd(), LocalDateTime.now().minus(RECEPTION_DELAY));
     }
 
     private String buildHeaders() {
