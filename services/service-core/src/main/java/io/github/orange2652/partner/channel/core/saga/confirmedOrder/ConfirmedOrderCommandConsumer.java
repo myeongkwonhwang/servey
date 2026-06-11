@@ -5,13 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.orange2652.partner.channel.gateway.logistics.LogisticsGateway;
 import io.github.orange2652.partner.channel.gateway.logistics.ShipmentRequest;
 import io.github.orange2652.partner.channel.gateway.logistics.ShipmentResponse;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.core.saga.confirmedOrder.TossOrderParser.Parsed;
 import io.github.orange2652.partner.channel.event.saga.ConfirmedOrderCommand;
 import io.github.orange2652.partner.channel.event.saga.SagaHeaders;
 import io.github.orange2652.partner.channel.event.saga.SagaTopics;
-import io.github.orange2652.partner.channel.persistence.idempotency.domain.ProcessedEventRepository;
+import io.github.orange2652.partner.channel.kafka.header.KafkaHeaderExtractor;
+import io.github.orange2652.partner.channel.persistence.idempotency.IdempotencyGuard;
 import io.github.orange2652.partner.channel.persistence.ordr.domain.Order;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,9 +53,8 @@ class ConfirmedOrderCommandConsumer {
 
     static final String CONSUMER_NAME = "service-core-confirmed-order-cmd";
     static final String COMMAND_TYPE_PREFIX = "CONFIRMED_ORDER";
-    static final String CHANNEL_TOSS = "TOSS";
 
-    private final ProcessedEventRepository processedEventRepository;
+    private final IdempotencyGuard idempotencyGuard;
     private final TossOrderParser tossOrderParser;
     private final LogisticsGateway logisticsGateway;
     private final OrderPersister orderPersister;
@@ -68,25 +68,18 @@ class ConfirmedOrderCommandConsumer {
                    @Header(KafkaHeaders.OFFSET) long offset,
                    @Payload String payload) {
 
-        String commandType = commandTypeHeader == null ? "" : new String(commandTypeHeader, StandardCharsets.UTF_8);
+        String commandType = KafkaHeaderExtractor.stringOrEmpty(commandTypeHeader);
         if (!commandType.startsWith(COMMAND_TYPE_PREFIX)) {
             return;   // 다른 step 의 command — flow only 토픽 구조에서 자기 step 만 처리
         }
-        if (sagaIdHeader == null) {
-            log.info("skip — no saga-id header partition={} offset={}", partition, offset);
-            return;
-        }
-        UUID sagaId;
-        try {
-            sagaId = UUID.fromString(new String(sagaIdHeader, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            log.info("skip — saga-id header not UUID partition={} offset={} reason={}",
-                    partition, offset, e.getMessage());
+        UUID sagaId = KafkaHeaderExtractor.uuid(sagaIdHeader).orElse(null);
+        if (sagaId == null) {
+            log.info("skip — saga-id header missing or invalid UUID partition={} offset={}", partition, offset);
             return;
         }
 
-        String eventId = partition + ":" + offset;
-        if (processedEventRepository.exists(CONSUMER_NAME, eventId)) {
+        String eventId = IdempotencyGuard.eventId(partition, offset);
+        if (idempotencyGuard.isAlreadyProcessed(CONSUMER_NAME, eventId)) {
             log.info("skip duplicate eventId={} sagaId={}", eventId, sagaId);
             return;
         }
@@ -100,7 +93,7 @@ class ConfirmedOrderCommandConsumer {
             return;
         }
 
-        if (!CHANNEL_TOSS.equals(command.channel())) {
+        if (!Channel.TOSS.code().equals(command.channel())) {
             log.info("unsupported channel sagaId={} channel={}", sagaId, command.channel());
             replyPublisher.publishFailed(sagaId, "UNSUPPORTED_CHANNEL", "channel=" + command.channel());
             return;

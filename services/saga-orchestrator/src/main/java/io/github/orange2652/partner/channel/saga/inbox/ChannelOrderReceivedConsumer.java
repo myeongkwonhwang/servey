@@ -3,12 +3,15 @@ package io.github.orange2652.partner.channel.saga.inbox;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.orange2652.partner.channel.common.Channel;
+import io.github.orange2652.partner.channel.event.saga.SagaCommandTypes;
 import io.github.orange2652.partner.channel.event.saga.SagaSteps;
 import io.github.orange2652.partner.channel.event.saga.SagaTypes;
 import io.github.orange2652.partner.channel.event.saga.UnconfirmedOrderCommand;
 import io.github.orange2652.partner.channel.persistence.saga.domain.SagaState;
+import io.github.orange2652.partner.channel.saga.exception.SagaPublishException;
+import io.github.orange2652.partner.channel.saga.publisher.SagaCommandPublisher;
 import io.github.orange2652.partner.channel.saga.state.SagaStateAdvancer;
-import io.github.orange2652.partner.channel.saga.unconfirmedOrder.UnconfirmedOrderCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -21,7 +24,7 @@ import org.springframework.stereotype.Component;
  * A1 흐름의 saga 시작 진입점.
  *
  * <p>{@code channel.order.received} consume → {@link SagaState} 생성 → {@link SagaStarter} 위임
- * → {@link UnconfirmedOrderCommandPublisher} 로 step 1 command 발행 → {@link SagaStateAdvancer} 로
+ * → {@link SagaCommandPublisher} 로 step 1 command 발행 → {@link SagaStateAdvancer} 로
  * {@code UNCONFIRMED_ORDER_SENT} 전이.</p>
  *
  * <p><b>흐름</b></p>
@@ -29,7 +32,7 @@ import org.springframework.stereotype.Component;
  *   <li>Kafka 에서 payload (외부 raw JSON) + key (= correlationKey = orderProductId) 수신</li>
  *   <li>payload 파싱하여 {@code orderProductId} 추출 (key 없을 때 fallback)</li>
  *   <li>{@link SagaState#start} → {@link SagaStarter#startIfAbsent} (Tx) — UNIQUE 로 중복 시작 차단</li>
- *   <li>(Tx 밖) {@link UnconfirmedOrderCommandPublisher#publish} — Kafka send + ack</li>
+ *   <li>(Tx 밖) {@link SagaCommandPublisher#publish} — Kafka send + ack. 실패 시 {@link SagaPublishException}</li>
  *   <li>(Tx) {@link SagaStateAdvancer#advance} → {@code UNCONFIRMED_ORDER_SENT}</li>
  * </ol>
  *
@@ -42,10 +45,9 @@ class ChannelOrderReceivedConsumer {
 
     static final String TOPIC = "channel.order.received";
     static final String CONSUMER_NAME = "saga-orchestrator";
-    static final String CHANNEL = "TOSS";
 
     private final SagaStarter sagaStarter;
-    private final UnconfirmedOrderCommandPublisher unconfirmedOrderCommandPublisher;
+    private final SagaCommandPublisher sagaCommandPublisher;
     private final SagaStateAdvancer sagaStateAdvancer;
     private final ObjectMapper objectMapper;
 
@@ -70,10 +72,13 @@ class ChannelOrderReceivedConsumer {
         log.info("saga started sagaId={} sagaType={} correlationKey={}",
                 state.sagaId(), SagaTypes.ORDER_RECEPTION, correlationKey);
 
-        UnconfirmedOrderCommand command = new UnconfirmedOrderCommand(CHANNEL, payload);
-        boolean published = unconfirmedOrderCommandPublisher.publish(state.sagaId(), command);
-        if (!published) {
-            log.info("unconfirmedOrder command publish failed — saga stays at STARTED sagaId={}", state.sagaId());
+        UnconfirmedOrderCommand command = new UnconfirmedOrderCommand(Channel.TOSS.code(), payload);
+        try {
+            sagaCommandPublisher.publish(state.sagaId(), SagaSteps.UNCONFIRMED_ORDER_SENT,
+                    SagaCommandTypes.UNCONFIRMED_ORDER_REQUEST, command);
+        } catch (SagaPublishException e) {
+            log.info("unconfirmedOrder command publish failed — saga stays at STARTED sagaId={} reason={}",
+                    state.sagaId(), e.getMessage());
             return;
         }
 

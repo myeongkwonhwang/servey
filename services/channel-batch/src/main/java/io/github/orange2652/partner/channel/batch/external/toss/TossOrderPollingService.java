@@ -3,6 +3,7 @@ package io.github.orange2652.partner.channel.batch.external.toss;
 import io.github.orange2652.partner.channel.client.toss.TossOrderClient;
 import io.github.orange2652.partner.channel.client.toss.TossOrderItem;
 import io.github.orange2652.partner.channel.client.toss.TossOrderPage;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.persistence.cursor.domain.PollingCursor;
 import io.github.orange2652.partner.channel.persistence.cursor.domain.PollingCursorRepository;
 import io.github.orange2652.partner.channel.persistence.outbox.domain.OutboxEvent;
@@ -28,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class TossOrderPollingService {
 
-    static final String CHANNEL = "TOSS";
+    static final String CHANNEL = Channel.TOSS.code();
     static final String RESOURCE = "ORDER";
     static final String AGGREGATE_TYPE = "ORDER";
     static final String EVENT_TYPE = "OrderReceived";

@@ -2,6 +2,7 @@ package io.github.orange2652.partner.channel.adapter.external.toss;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.persistence.staging.domain.StagingOrder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,14 +17,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TossStagingOrderFactory {
 
-    static final String CHANNEL = "TOSS";
-
     private final ObjectMapper objectMapper;
 
     public StagingOrder from(String raw) throws JsonProcessingException {
         TossOrderPayload parsed = objectMapper.readValue(raw, TossOrderPayload.class);
         return StagingOrder.newRecord(
-                CHANNEL,
+                Channel.TOSS.code(),
                 String.valueOf(parsed.orderId()),
                 String.valueOf(parsed.orderProductId()),
                 parsed.orderProductStatus(),

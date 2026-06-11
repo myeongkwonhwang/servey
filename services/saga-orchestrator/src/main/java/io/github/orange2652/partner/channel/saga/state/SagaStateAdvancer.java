@@ -35,7 +35,7 @@ public class SagaStateAdvancer {
             log.info("saga advance skipped — not found sagaId={} nextStep={}", sagaId, nextStep);
             return false;
         }
-        SagaState current = found.get();
+        SagaState current = found.orElseThrow();
         if (nextStep.equals(current.currentStep())) {
             log.info("saga advance skipped — already at step sagaId={} step={}", sagaId, nextStep);
             return false;
@@ -76,7 +76,7 @@ public class SagaStateAdvancer {
             log.info("saga status transit skipped — not found sagaId={} target={}", sagaId, targetStatus);
             return false;
         }
-        SagaState current = found.get();
+        SagaState current = found.orElseThrow();
         if (targetStatus == current.status()) {
             log.info("saga status transit skipped — already at status sagaId={} status={}",
                     sagaId, targetStatus);

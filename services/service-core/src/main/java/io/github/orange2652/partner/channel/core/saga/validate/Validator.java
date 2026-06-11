@@ -3,31 +3,38 @@ package io.github.orange2652.partner.channel.core.saga.validate;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.orange2652.partner.channel.common.Channel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * A1 step 2 — 판매가능 검증 (read-only).
+ * A1 step 2 — 판매가능 비즈니스 검증 (read-only).
+ *
+ * <p><b>책임 (step 1 BasicValidator 와의 의도적 depth defense)</b></p>
+ * <ul>
+ *   <li>step 1 ({@code channel-adapter.BasicValidator}): "외부 호출 가능한가" — fast fail 데이터 무결성.</li>
+ *   <li>step 2 (여기, service-core): <b>"판매 가능한가"</b> — 비즈니스 룰. 재고 / 가격 / 채널 등록 /
+ *       상품 활성화 등으로 확장될 자리.</li>
+ * </ul>
+ * <p>현재 둘 다 PAID 만 보고 있어 표면상 중복이지만, 검증 레이어/목적이 다르므로 룰 확장 시 자연스럽게
+ * 갈라진다 (예: step 2 가 채널 등록 / 재고로 확장돼도 step 1 은 raw 무결성에 집중).</p>
  *
  * <p>채널별 룰:</p>
  * <ul>
  *   <li>{@code TOSS} — raw 의 {@code orderProductStatus == "PAID"} 만 통과</li>
  *   <li>그 외 채널 — 미지원 → {@link Verdict#unsupportedChannel} 으로 FAIL</li>
  * </ul>
- *
- * <p>학습 단계 단순 룰. 실 환경에서는 상품 활성화 / 재고 / 채널 등록 / 가격 등 다항 검증.</p>
  */
 @Component
 @RequiredArgsConstructor
 public class Validator {
 
-    static final String CHANNEL_TOSS = "TOSS";
     static final String TOSS_SELLABLE_STATUS = "PAID";
 
     private final ObjectMapper objectMapper;
 
     public Verdict validate(String channel, String raw) {
-        if (!CHANNEL_TOSS.equals(channel)) {
+        if (!Channel.TOSS.code().equals(channel)) {
             return Verdict.unsupportedChannel(channel);
         }
         JsonNode node;

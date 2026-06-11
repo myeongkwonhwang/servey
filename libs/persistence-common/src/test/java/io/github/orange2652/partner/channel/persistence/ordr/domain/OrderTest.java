@@ -3,6 +3,7 @@ package io.github.orange2652.partner.channel.persistence.ordr.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import io.github.orange2652.partner.channel.common.Channel;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -10,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class OrderTest {
 
-    private static final String CHANNEL = "TOSS";
+    private static final String CHANNEL = Channel.TOSS.code();
     private static final String EXTERNAL_ORDER_ID = "100001";
     private static final String EXTERNAL_ORDER_PRODUCT_ID = "100001-1";
     private static final String SHIPMENT_ID = "MOCK-uuid";

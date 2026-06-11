@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.orange2652.partner.channel.adapter.external.toss.BasicValidator.Verdict;
+import io.github.orange2652.partner.channel.common.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,7 +28,7 @@ class BasicValidatorTest {
         void paidIsOk() {
             String raw = "{\"orderId\":1,\"orderProductId\":2,\"orderProductStatus\":\"PAID\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.valid()).isTrue();
             assertThat(verdict.errorCode()).isNull();
@@ -38,7 +39,7 @@ class BasicValidatorTest {
         void nonPaidFails() {
             String raw = "{\"orderId\":1,\"orderProductId\":2,\"orderProductStatus\":\"PREPARING_PRODUCT\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.valid()).isFalse();
             assertThat(verdict.errorCode()).isEqualTo("NOT_PAID");
@@ -50,7 +51,7 @@ class BasicValidatorTest {
         void missingOrderIdFails() {
             String raw = "{\"orderProductId\":2,\"orderProductStatus\":\"PAID\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.errorCode()).isEqualTo("MISSING_ORDER_ID");
         }
@@ -60,7 +61,7 @@ class BasicValidatorTest {
         void missingOrderProductIdFails() {
             String raw = "{\"orderId\":1,\"orderProductStatus\":\"PAID\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.errorCode()).isEqualTo("MISSING_ORDER_PRODUCT_ID");
         }
@@ -70,7 +71,7 @@ class BasicValidatorTest {
         void missingStatusFails() {
             String raw = "{\"orderId\":1,\"orderProductId\":2}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.errorCode()).isEqualTo("MISSING_ORDER_STATUS");
         }
@@ -78,7 +79,7 @@ class BasicValidatorTest {
         @Test
         @DisplayName("invalid JSON → RAW_PARSE_FAILED")
         void invalidJsonFails() {
-            Verdict verdict = validator.validate("TOSS", "not-a-json");
+            Verdict verdict = validator.validate(Channel.TOSS.code(), "not-a-json");
 
             assertThat(verdict.errorCode()).isEqualTo("RAW_PARSE_FAILED");
         }

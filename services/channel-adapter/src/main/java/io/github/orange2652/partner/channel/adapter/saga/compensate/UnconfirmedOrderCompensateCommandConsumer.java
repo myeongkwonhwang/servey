@@ -5,11 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.orange2652.partner.channel.client.toss.CancelOrderRequest;
 import io.github.orange2652.partner.channel.client.toss.CancelOrderResult;
 import io.github.orange2652.partner.channel.client.toss.TossOrderCancelClient;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.event.saga.SagaHeaders;
 import io.github.orange2652.partner.channel.event.saga.SagaTopics;
 import io.github.orange2652.partner.channel.event.saga.UnconfirmedOrderCompensateCommand;
-import io.github.orange2652.partner.channel.persistence.idempotency.domain.ProcessedEventRepository;
-import java.nio.charset.StandardCharsets;
+import io.github.orange2652.partner.channel.kafka.header.KafkaHeaderExtractor;
+import io.github.orange2652.partner.channel.persistence.idempotency.IdempotencyGuard;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,9 +45,8 @@ class UnconfirmedOrderCompensateCommandConsumer {
 
     static final String CONSUMER_NAME = "channel-adapter-unconfirmed-order-compensate-cmd";
     static final String COMMAND_TYPE_PREFIX = "UNCONFIRMED_ORDER_COMPENSATE_REQUEST";
-    static final String CHANNEL_TOSS = "TOSS";
 
-    private final ProcessedEventRepository processedEventRepository;
+    private final IdempotencyGuard idempotencyGuard;
     private final TossOrderCancelClient tossOrderCancelClient;
     private final StagingOrderCancelPersister stagingOrderCancelPersister;
     private final UnconfirmedOrderCompensateReplyPublisher replyPublisher;
@@ -59,25 +59,18 @@ class UnconfirmedOrderCompensateCommandConsumer {
                    @Header(KafkaHeaders.OFFSET) long offset,
                    @Payload String payload) {
 
-        String commandType = commandTypeHeader == null ? "" : new String(commandTypeHeader, StandardCharsets.UTF_8);
+        String commandType = KafkaHeaderExtractor.stringOrEmpty(commandTypeHeader);
         if (!COMMAND_TYPE_PREFIX.equals(commandType)) {
             return;
         }
-        if (sagaIdHeader == null) {
-            log.info("skip — no saga-id header partition={} offset={}", partition, offset);
-            return;
-        }
-        UUID sagaId;
-        try {
-            sagaId = UUID.fromString(new String(sagaIdHeader, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            log.info("skip — saga-id header not UUID partition={} offset={} reason={}",
-                    partition, offset, e.getMessage());
+        UUID sagaId = KafkaHeaderExtractor.uuid(sagaIdHeader).orElse(null);
+        if (sagaId == null) {
+            log.info("skip — saga-id header missing or invalid UUID partition={} offset={}", partition, offset);
             return;
         }
 
-        String eventId = partition + ":" + offset;
-        if (processedEventRepository.exists(CONSUMER_NAME, eventId)) {
+        String eventId = IdempotencyGuard.eventId(partition, offset);
+        if (idempotencyGuard.isAlreadyProcessed(CONSUMER_NAME, eventId)) {
             log.info("skip duplicate eventId={} sagaId={}", eventId, sagaId);
             return;
         }
@@ -91,7 +84,7 @@ class UnconfirmedOrderCompensateCommandConsumer {
             return;
         }
 
-        if (!CHANNEL_TOSS.equals(cmd.channel())) {
+        if (!Channel.TOSS.code().equals(cmd.channel())) {
             log.info("unsupported channel sagaId={} channel={}", sagaId, cmd.channel());
             replyPublisher.publishFailed(sagaId, "UNSUPPORTED_CHANNEL", "channel=" + cmd.channel());
             return;

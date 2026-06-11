@@ -4,17 +4,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.orange2652.partner.channel.client.toss.TossOrderStatuses;
+import io.github.orange2652.partner.channel.common.Channel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * A1 step 1 의 fast fail 기본 검증 — 데이터 무결성.
+ * A1 step 1 의 fast fail 기본 검증 — 외부 호출 가능성 + 데이터 무결성.
  *
- * <p>step 2 validate (비즈니스 검증, service-core) 와 책임이 다름:</p>
+ * <p><b>책임 (step 2 validate 와의 의도적 depth defense)</b></p>
  * <ul>
- *   <li>기본검증 (여기): 필수 필드 / 외부 상태가 적재 가능한지 (raw 가 신뢰 못 할 데이터일 수 있음)</li>
- *   <li>비즈니스 검증 (service-core): 재고 / 가격 / 판매가능 — saga step 2</li>
+ *   <li>step 1 (여기, channel-adapter): <b>"외부 호출이 가능한 상태인가"</b> — 외부 API
+ *       (PAID → PREPARING_PRODUCT 전이) 호출 전에 실패할 raw 를 거르는 fast fail. 잘못된 외부 호출 비용을 줄임.</li>
+ *   <li>step 2 ({@code core.saga.validate.Validator}, service-core): <b>"판매 가능한가"</b> —
+ *       비즈니스 룰. 현재는 PAID 동일 체크지만 재고 / 가격 / 채널 등록 등으로 확장될 자리.</li>
  * </ul>
+ * <p>두 곳이 같은 PAID 룰을 보는 것은 우연이 아니라 <b>depth defense</b> — 외부 호출 직전과 비즈니스
+ * 진입 직전에 각각 게이트가 있고, 룰이 향후 분기될 때 자연스럽게 갈라진다.</p>
  *
  * <p>현재 룰 (TOSS 한정):</p>
  * <ul>
@@ -29,7 +34,7 @@ public class BasicValidator {
     private final ObjectMapper objectMapper;
 
     public Verdict validate(String channel, String raw) {
-        if (!"TOSS".equals(channel)) {
+        if (!Channel.TOSS.code().equals(channel)) {
             return Verdict.failed("UNSUPPORTED_CHANNEL", "channel=" + channel);
         }
         JsonNode node;

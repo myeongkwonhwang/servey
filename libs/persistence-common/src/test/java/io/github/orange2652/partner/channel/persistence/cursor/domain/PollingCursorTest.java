@@ -3,6 +3,7 @@ package io.github.orange2652.partner.channel.persistence.cursor.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import io.github.orange2652.partner.channel.common.Channel;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -10,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class PollingCursorTest {
 
-    private static final String CHANNEL = "TOSS";
+    private static final String CHANNEL = Channel.TOSS.code();
     private static final String RESOURCE = "ORDER";
     private static final LocalDateTime WINDOW_START = LocalDateTime.parse("2026-06-09T00:00:00");
     private static final LocalDateTime WINDOW_END = LocalDateTime.parse("2026-06-09T01:00:00");

@@ -3,6 +3,7 @@ package io.github.orange2652.partner.channel.core.saga.validate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.core.saga.validate.Validator.Verdict;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +28,7 @@ class ValidatorTest {
         void paidIsSellable() {
             String raw = "{\"orderProductId\":1,\"orderProductStatus\":\"PAID\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.sellable()).isTrue();
             assertThat(verdict.errorCode()).isNull();
@@ -38,7 +39,7 @@ class ValidatorTest {
         void nonPaidIsNotSellable() {
             String raw = "{\"orderProductId\":1,\"orderProductStatus\":\"CANCELED\"}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.sellable()).isFalse();
             assertThat(verdict.errorCode()).isEqualTo("NOT_SELLABLE");
@@ -50,7 +51,7 @@ class ValidatorTest {
         void missingStatusIsNotSellable() {
             String raw = "{\"orderProductId\":1}";
 
-            Verdict verdict = validator.validate("TOSS", raw);
+            Verdict verdict = validator.validate(Channel.TOSS.code(), raw);
 
             assertThat(verdict.sellable()).isFalse();
             assertThat(verdict.errorCode()).isEqualTo("NOT_SELLABLE");
@@ -60,7 +61,7 @@ class ValidatorTest {
         @Test
         @DisplayName("raw 가 JSON 파싱 실패면 RAW_PARSE_FAILED")
         void invalidJsonFails() {
-            Verdict verdict = validator.validate("TOSS", "not-a-json");
+            Verdict verdict = validator.validate(Channel.TOSS.code(), "not-a-json");
 
             assertThat(verdict.sellable()).isFalse();
             assertThat(verdict.errorCode()).isEqualTo("RAW_PARSE_FAILED");

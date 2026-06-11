@@ -2,18 +2,20 @@ package io.github.orange2652.partner.channel.adapter.saga.unconfirmedOrder;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.orange2652.partner.channel.adapter.exception.UnsupportedChannelException;
 import io.github.orange2652.partner.channel.adapter.external.toss.BasicValidator;
 import io.github.orange2652.partner.channel.adapter.external.toss.BasicValidator.Verdict;
 import io.github.orange2652.partner.channel.adapter.external.toss.TossStagingOrderFactory;
 import io.github.orange2652.partner.channel.client.toss.OrderProductStatusChangeResult;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.client.toss.TossOrderStatusClient;
 import io.github.orange2652.partner.channel.client.toss.TossOrderStatuses;
 import io.github.orange2652.partner.channel.event.saga.SagaHeaders;
 import io.github.orange2652.partner.channel.event.saga.SagaTopics;
 import io.github.orange2652.partner.channel.event.saga.UnconfirmedOrderCommand;
-import io.github.orange2652.partner.channel.persistence.idempotency.domain.ProcessedEventRepository;
+import io.github.orange2652.partner.channel.kafka.header.KafkaHeaderExtractor;
+import io.github.orange2652.partner.channel.persistence.idempotency.IdempotencyGuard;
 import io.github.orange2652.partner.channel.persistence.staging.domain.StagingOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -53,9 +55,8 @@ class UnconfirmedOrderCommandConsumer {
 
     static final String CONSUMER_NAME = "channel-adapter-unconfirmed-order-cmd";
     static final String EXPECTED_COMMAND_TYPE = "UNCONFIRMED_ORDER_REQUEST";   // 보상 command (UNCONFIRMED_ORDER_COMPENSATE_*) 와 충돌 방지 위해 정확 매칭
-    static final String CHANNEL_TOSS = "TOSS";
 
-    private final ProcessedEventRepository processedEventRepository;
+    private final IdempotencyGuard idempotencyGuard;
     private final BasicValidator basicValidator;
     private final TossOrderStatusClient tossOrderStatusClient;
     private final StagingOrderPersister stagingOrderPersister;
@@ -70,25 +71,18 @@ class UnconfirmedOrderCommandConsumer {
                    @Header(KafkaHeaders.OFFSET) long offset,
                    @Payload String payload) {
 
-        String commandType = commandTypeHeader == null ? "" : new String(commandTypeHeader, StandardCharsets.UTF_8);
+        String commandType = KafkaHeaderExtractor.stringOrEmpty(commandTypeHeader);
         if (!EXPECTED_COMMAND_TYPE.equals(commandType)) {
             return;
         }
-        if (sagaIdHeader == null) {
-            log.info("skip — no saga-id header partition={} offset={}", partition, offset);
-            return;
-        }
-        UUID sagaId;
-        try {
-            sagaId = UUID.fromString(new String(sagaIdHeader, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            log.info("skip — saga-id header not UUID partition={} offset={} reason={}",
-                    partition, offset, e.getMessage());
+        UUID sagaId = KafkaHeaderExtractor.uuid(sagaIdHeader).orElse(null);
+        if (sagaId == null) {
+            log.info("skip — saga-id header missing or invalid UUID partition={} offset={}", partition, offset);
             return;
         }
 
-        String eventId = partition + ":" + offset;
-        if (processedEventRepository.exists(CONSUMER_NAME, eventId)) {
+        String eventId = IdempotencyGuard.eventId(partition, offset);
+        if (idempotencyGuard.isAlreadyProcessed(CONSUMER_NAME, eventId)) {
             log.info("skip duplicate eventId={} sagaId={}", eventId, sagaId);
             return;
         }
@@ -159,15 +153,9 @@ class UnconfirmedOrderCommandConsumer {
     }
 
     private StagingOrder buildOrder(UnconfirmedOrderCommand command) throws JsonProcessingException {
-        if (CHANNEL_TOSS.equals(command.channel())) {
+        if (Channel.TOSS.code().equals(command.channel())) {
             return tossStagingOrderFactory.from(command.raw());
         }
         throw new UnsupportedChannelException("channel=" + command.channel());
-    }
-
-    private static final class UnsupportedChannelException extends RuntimeException {
-        UnsupportedChannelException(String message) {
-            super(message);
-        }
     }
 }

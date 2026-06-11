@@ -35,7 +35,7 @@ class StagingOrderCancelPersister {
             processedEventRepository.save(ProcessedEvent.newRecord(consumerName, eventId));
             return false;
         }
-        StagingOrder current = found.get();
+        StagingOrder current = found.orElseThrow();
         if (current.isCanceled()) {
             processedEventRepository.save(ProcessedEvent.newRecord(consumerName, eventId));
             return false;

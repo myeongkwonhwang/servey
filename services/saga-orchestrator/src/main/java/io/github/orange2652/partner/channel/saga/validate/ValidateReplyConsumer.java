@@ -3,18 +3,19 @@ package io.github.orange2652.partner.channel.saga.validate;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.orange2652.partner.channel.common.Channel;
 import io.github.orange2652.partner.channel.event.saga.ConfirmedOrderCommand;
 import io.github.orange2652.partner.channel.event.saga.SagaCommandTypes;
 import io.github.orange2652.partner.channel.event.saga.SagaHeaders;
 import io.github.orange2652.partner.channel.event.saga.SagaSteps;
 import io.github.orange2652.partner.channel.event.saga.SagaTopics;
 import io.github.orange2652.partner.channel.event.saga.UnconfirmedOrderCompensateCommand;
+import io.github.orange2652.partner.channel.kafka.header.KafkaHeaderExtractor;
 import io.github.orange2652.partner.channel.persistence.saga.domain.SagaState;
 import io.github.orange2652.partner.channel.persistence.saga.domain.SagaStateRepository;
-import io.github.orange2652.partner.channel.saga.compensate.UnconfirmedOrderCompensateCommandPublisher;
-import io.github.orange2652.partner.channel.saga.confirmedOrder.ConfirmedOrderCommandPublisher;
+import io.github.orange2652.partner.channel.saga.exception.SagaPublishException;
+import io.github.orange2652.partner.channel.saga.publisher.SagaCommandPublisher;
 import io.github.orange2652.partner.channel.saga.state.SagaStateAdvancer;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +34,11 @@ import org.springframework.stereotype.Component;
  *   <li>saga state advance to {@code VALIDATED}</li>
  *   <li>saga state 조회 → payload (외부 raw) 가져옴</li>
  *   <li>{@link ConfirmedOrderCommand} 생성 — channel + raw</li>
- *   <li>{@link ConfirmedOrderCommandPublisher#publish} (Tx 밖)</li>
+ *   <li>{@link SagaCommandPublisher#publish} (Tx 밖). 실패 시 {@link SagaPublishException}</li>
  *   <li>saga state advance to {@code CONFIRMED_ORDER_SENT}</li>
  * </ol>
  *
- * <p>FAIL reply 는 {@code VALIDATE_FAILED} 로 advance 만. 보상 (staging DELETE) 은 다음 라운드.</p>
+ * <p>FAIL reply 는 {@code VALIDATE_FAILED} → compensate → step 1 보상 command 발행.</p>
  *
  * <p>채널: 현재 토스 전용 ({@code CHANNEL="TOSS"} 하드코딩) — saga state 에 채널 컬럼 없음.</p>
  */
@@ -48,12 +49,10 @@ class ValidateReplyConsumer {
 
     static final String CONSUMER_NAME = "saga-orchestrator-validate-reply";
     static final String COMMAND_TYPE_PREFIX = "VALIDATE";
-    static final String CHANNEL = "TOSS";
 
     private final SagaStateAdvancer sagaStateAdvancer;
     private final SagaStateRepository sagaStateRepository;
-    private final ConfirmedOrderCommandPublisher confirmedOrderCommandPublisher;
-    private final UnconfirmedOrderCompensateCommandPublisher compensateCommandPublisher;
+    private final SagaCommandPublisher sagaCommandPublisher;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = SagaTopics.ORDER_REPLY, groupId = CONSUMER_NAME)
@@ -63,20 +62,13 @@ class ValidateReplyConsumer {
                  @Header(KafkaHeaders.OFFSET) long offset,
                  @Payload String payload) {
 
-        String commandType = commandTypeHeader == null ? "" : new String(commandTypeHeader, StandardCharsets.UTF_8);
+        String commandType = KafkaHeaderExtractor.stringOrEmpty(commandTypeHeader);
         if (!commandType.startsWith(COMMAND_TYPE_PREFIX)) {
             return;   // 다른 step 의 reply — flow only 토픽 구조에서 자기 step 만 처리
         }
-        if (sagaIdHeader == null) {
-            log.info("skip — no saga-id header partition={} offset={}", partition, offset);
-            return;
-        }
-        UUID sagaId;
-        try {
-            sagaId = UUID.fromString(new String(sagaIdHeader, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            log.info("skip — saga-id header not UUID partition={} offset={} reason={}",
-                    partition, offset, e.getMessage());
+        UUID sagaId = KafkaHeaderExtractor.uuid(sagaIdHeader).orElse(null);
+        if (sagaId == null) {
+            log.info("skip — saga-id header missing or invalid UUID partition={} offset={}", partition, offset);
             return;
         }
 
@@ -99,17 +91,20 @@ class ValidateReplyConsumer {
             return;
         }
 
-        String externalOrderProductId = extractExternalOrderProductId(found.get().payload());
+        String externalOrderProductId = extractExternalOrderProductId(found.orElseThrow().payload());
         if (externalOrderProductId == null) {
             log.info("skip compensate publish — cannot extract externalOrderProductId sagaId={}", sagaId);
             return;
         }
 
         UnconfirmedOrderCompensateCommand cmd = new UnconfirmedOrderCompensateCommand(
-                CHANNEL, externalOrderProductId, "validate FAILED");
-        boolean published = compensateCommandPublisher.publish(sagaId, cmd);
-        if (!published) {
-            log.info("compensate command publish failed — saga stays COMPENSATING sagaId={}", sagaId);
+                Channel.TOSS.code(), externalOrderProductId, "validate FAILED");
+        try {
+            sagaCommandPublisher.publish(sagaId, SagaSteps.UNCONFIRMED_ORDER_COMPENSATE_SENT,
+                    SagaCommandTypes.UNCONFIRMED_ORDER_COMPENSATE_REQUEST, cmd);
+        } catch (SagaPublishException e) {
+            log.info("compensate command publish failed — saga stays COMPENSATING sagaId={} reason={}",
+                    sagaId, e.getMessage());
             return;
         }
         sagaStateAdvancer.advance(sagaId, SagaSteps.UNCONFIRMED_ORDER_COMPENSATE_SENT);
@@ -139,10 +134,13 @@ class ValidateReplyConsumer {
             return;
         }
 
-        ConfirmedOrderCommand command = new ConfirmedOrderCommand(CHANNEL, found.get().payload());
-        boolean published = confirmedOrderCommandPublisher.publish(sagaId, command);
-        if (!published) {
-            log.info("confirmedOrder command publish failed — saga stays at VALIDATED sagaId={}", sagaId);
+        ConfirmedOrderCommand command = new ConfirmedOrderCommand(Channel.TOSS.code(), found.orElseThrow().payload());
+        try {
+            sagaCommandPublisher.publish(sagaId, SagaSteps.CONFIRMED_ORDER_SENT,
+                    SagaCommandTypes.CONFIRMED_ORDER_REQUEST, command);
+        } catch (SagaPublishException e) {
+            log.info("confirmedOrder command publish failed — saga stays at VALIDATED sagaId={} reason={}",
+                    sagaId, e.getMessage());
             return;
         }
 
